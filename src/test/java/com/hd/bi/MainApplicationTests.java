@@ -1,6 +1,7 @@
 package com.hd.bi;
 
 import com.hd.bi.common.ErrorCode;
+import com.hd.bi.config.RabbitmqConfig;
 import com.hd.bi.config.WxOpenConfig;
 
 import javax.annotation.Resource;
@@ -12,6 +13,7 @@ import org.redisson.api.RRateLimiter;
 import org.redisson.api.RateIntervalUnit;
 import org.redisson.api.RateType;
 import org.redisson.api.RedissonClient;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.boot.test.context.SpringBootTest;
 
 /**
@@ -28,6 +30,10 @@ class MainApplicationTests {
 
     @Resource
     private RedisLimiterManager redisLimiterManager;
+    @Resource
+    private RabbitTemplate rabbitTemplate;
+
+
     @Test
     void contextLoads() {
         System.out.println(wxOpenConfig);
@@ -42,8 +48,6 @@ class MainApplicationTests {
     }
     @Test
     void t1(){
-        Integer a = 129;
-        Integer b = 129;
-        System.out.println(a==b);
+        rabbitTemplate.convertAndSend(RabbitmqConfig.AI_WORK_EXCHANGE,RabbitmqConfig.AI_WORK_ROUTING_KEY,"13465");
     }
 }

@@ -7,6 +7,7 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.github.rholder.retry.RetryException;
 import com.github.rholder.retry.Retryer;
 import com.hd.bi.common.ErrorCode;
+import com.hd.bi.config.RabbitmqConfig;
 import com.hd.bi.constant.CommonConstant;
 import com.hd.bi.exception.BusinessException;
 import com.hd.bi.exception.ThrowUtils;
@@ -26,6 +27,7 @@ import com.hd.bi.utils.SqlUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -48,7 +50,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class ChartServiceImpl extends ServiceImpl<ChartMapper, Chart>
     implements ChartService{
 
-    private final long biModelId = 1697907890536382465L;
 
     @Resource
     private UserService userService;
@@ -59,8 +60,9 @@ public class ChartServiceImpl extends ServiceImpl<ChartMapper, Chart>
     @Resource
     private ThreadPoolExecutor threadPoolExecutor;
     @Resource
-    private Retryer<Boolean> retryer;
-
+    private Retryer<Boolean> myRetryer;
+    @Resource
+    private RabbitTemplate rabbitTemplate;
 
     @Override
     public BiResponse genChart(MultipartFile multipartFile, GenChartByAiRequest genChartByAiRequest, HttpServletRequest request) {
@@ -103,7 +105,7 @@ public class ChartServiceImpl extends ServiceImpl<ChartMapper, Chart>
         chart.setChartData(csvData);
         chart.setChartType(chartType);
         // 调用AI
-        handleAI(chart,biModelId,userInput.toString());
+        handleAI(chart,CommonConstant.biModelId,userInput.toString());
         chart.setUserId(loginUser.getId());
         boolean saveResult = this.save(chart);
         ThrowUtils.throwIf(!saveResult, ErrorCode.SYSTEM_ERROR, "图表保存失败");
@@ -171,12 +173,52 @@ public class ChartServiceImpl extends ServiceImpl<ChartMapper, Chart>
                 handleChartUpdateError(chart.getId(), "图表更新失败！！");
             }
             // 调用AI
-            handleAI(upChart,biModelId,userInput.toString());
+            handleAI(upChart,CommonConstant.biModelId,userInput.toString());
             if (!this.updateById(upChart)) {
                 handleChartUpdateError(chart.getId(), "图表更新失败！！");
             }
         }, threadPoolExecutor);
 
+    }
+
+    @Override
+    public void genChartAsyncByMq(MultipartFile multipartFile, GenChartByAiRequest genChartByAiRequest, HttpServletRequest request) {
+        String name = genChartByAiRequest.getName();
+        String goal = genChartByAiRequest.getGoal();
+        String chartType = genChartByAiRequest.getChartType();
+        // 校验
+        ThrowUtils.throwIf(StringUtils.isBlank(goal), ErrorCode.PARAMS_ERROR, "目标为空");
+        ThrowUtils.throwIf(StringUtils.isNotBlank(name) && name.length() > 100, ErrorCode.PARAMS_ERROR, "名称过长");
+        // 校验文件
+        long size = multipartFile.getSize();
+        String originalFilename = multipartFile.getOriginalFilename();
+        // 校验文件大小
+        final long ONE_MB = 1024 * 1024L;
+        ThrowUtils.throwIf(size > ONE_MB, ErrorCode.PARAMS_ERROR, "文件超过 1M");
+        // 校验文件后缀 aaa.png
+        String suffix = FileUtil.getSuffix(originalFilename);
+        final List<String> validFileSuffixList = Arrays.asList("xlsx","xls");
+        ThrowUtils.throwIf(!validFileSuffixList.contains(suffix), ErrorCode.PARAMS_ERROR, "文件后缀非法");
+//        调用ai需要登录
+        User loginUser = userService.getLoginUser(request);
+//        每秒只能请求2次
+        limiterManager.limitGenChart("ChartLimiter_"+loginUser.getId());
+        // 压缩数据
+        String csvData = ExcellUtils.xlsToCsv(multipartFile);
+        // 保存提交的任务
+        Chart chart = new Chart();
+        chart.setName(name);
+        chart.setGoal(goal);
+        chart.setChartData(csvData);
+        chart.setChartType(chartType);
+        chart.setUserId(loginUser.getId());
+        chart.setStatus(ChartStatusEnum.WAIT.getValue());
+        chart.setExecMessage("图表待生成！");
+        if (!this.save(chart)) {
+            handleChartUpdateError(chart.getId(), "任务存储失败！");
+        }
+//        提交任务
+        rabbitTemplate.convertAndSend(RabbitmqConfig.AI_WORK_EXCHANGE,RabbitmqConfig.AI_WORK_ROUTING_KEY,chart.getId());
     }
 
     /**
@@ -188,7 +230,7 @@ public class ChartServiceImpl extends ServiceImpl<ChartMapper, Chart>
     public void handleAI(Chart chart, long biModelId, String userInput){
         try {
             AtomicInteger count = new AtomicInteger();
-            retryer.call(()->{
+            myRetryer.call(()->{
                 log.info("第{}次调用AI", count.incrementAndGet());
                 String res = aiManager.doChat(biModelId, userInput.toString());
                 String[] split = res.split("【【【【【");
@@ -226,6 +268,16 @@ public class ChartServiceImpl extends ServiceImpl<ChartMapper, Chart>
         QueryWrapper<Chart> queryWrapper = getQueryWrapper(queryRequest);
         Page page = new Page(queryRequest.getCurrent(), queryRequest.getPageSize());
         return this.page(page, queryWrapper);
+    }
+
+    /**
+     * 重新生成图表
+     * @param id
+     */
+    @Override
+    public void reDoGenChart(long id) {
+        //        提交任务
+        rabbitTemplate.convertAndSend(RabbitmqConfig.AI_WORK_EXCHANGE,RabbitmqConfig.AI_WORK_ROUTING_KEY,id);
     }
 
     /**

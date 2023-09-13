@@ -23,5 +23,11 @@ public interface ChartService extends IService<Chart> {
     // 异步
     void genChartAsync(MultipartFile multipartFile, GenChartByAiRequest genChartByAiRequest, HttpServletRequest request);
 
+//    mq异步调用
+
+    void genChartAsyncByMq(MultipartFile multipartFile, GenChartByAiRequest genChartByAiRequest, HttpServletRequest request);
+
     Page<Chart>listMyChartPage(ChartQueryRequest queryRequest);
+
+    void reDoGenChart(long id);
 }

@@ -17,6 +17,7 @@ import javax.annotation.Resource;
  */
 @Component
 public class AiManager {
+
     @Resource
     private YuCongMingClient client;
     /**
