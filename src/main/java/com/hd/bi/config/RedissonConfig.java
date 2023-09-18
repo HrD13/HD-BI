@@ -28,11 +28,14 @@ public class RedissonConfig {
 
     private Integer port;
 
+    private String password;
+
     @Bean
     public RedissonClient redissonClient(){
         Config config = new Config();
         config.useSingleServer()
                 .setDatabase(database)
+//                .setPassword(password)
                 .setAddress("redis://" + host + ":" + port);
         RedissonClient redisson = Redisson.create(config);
         return redisson;

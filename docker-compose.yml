@@ -1,0 +1,49 @@
+version: "1"
+
+networks:
+  hdbi-net:
+
+services:
+  hdbi:
+    container_name: 'hdbi'
+    image: hdbi:1.0
+    ports:
+      - 8001:8001
+    networks:
+      - hdbi-net
+    depends_on:
+      - rabbitmq
+  rabbitmq:
+    container_name: 'rabbitmq'
+    image: rabbitmq:3-management
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      - RABBITMQ_ERLANG_COOKIE=secretcookie
+      - RABBITMQ_DEFAULT_USER=admin # 设置管理员用户名
+      - RABBITMQ_DEFAULT_PASS=admin # 设置管理员密码
+    volumes:
+      - ./rabbitmq/data:/var/lib/rabbitmq/
+    networks:
+      - hdbi-net
+    restart: always
+  nginx:
+    container_name: nginx
+    image: nginx
+    ports:
+      - 80:80
+      - 443:443
+    volumes:
+      - /usr/local/nginx/html:/usr/share/nginx/html
+      - /usr/local/nginx/www:/var/www
+      - /usr/local/nginx/logs:/var/log/nginx
+      # 有可能会出现不能挂载，这个时候用手动拷贝配置文件就行
+      - /usr/local/nginx/nginx.conf/:/etc/nginx/nginx.conf
+      - /usr/local/nginx/etc/cert:/etc/nginx/cert
+      - /usr/local/nginx/conf.d:/etc/nginx/conf.d
+    environment:
+      - NGINX_PORT=80
+      - TZ=Asia/Shanghai
+    privileged: true
+    restart: always

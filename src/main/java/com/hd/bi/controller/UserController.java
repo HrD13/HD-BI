@@ -9,7 +9,6 @@ import com.hd.bi.common.BaseResponse;
 import com.hd.bi.common.DeleteRequest;
 import com.hd.bi.common.ErrorCode;
 import com.hd.bi.common.ResultUtils;
-import com.hd.bi.config.WxOpenConfig;
 import com.hd.bi.exception.ThrowUtils;
 import com.hd.bi.model.dto.user.UserAddRequest;
 import com.hd.bi.model.dto.user.UserLoginRequest;
@@ -24,19 +23,11 @@ import com.hd.bi.model.vo.UserVO;
 import java.util.List;
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+
 import lombok.extern.slf4j.Slf4j;
-import me.chanjar.weixin.common.bean.WxOAuth2UserInfo;
-import me.chanjar.weixin.common.bean.oauth2.WxOAuth2AccessToken;
-import me.chanjar.weixin.mp.api.WxMpService;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 /**
  * 用户接口
@@ -49,9 +40,6 @@ public class UserController {
 
     @Resource
     private UserService userService;
-
-    @Resource
-    private WxOpenConfig wxOpenConfig;
 
     // region 登录相关
 
