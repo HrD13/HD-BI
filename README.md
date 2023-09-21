@@ -2,6 +2,8 @@
 * 前端代码地址：https://github.com/HrD13/HD-BI-frontend
 * 基于 Spring Boot+ AI 的智能数据分析平台。用户只需要导入原始数据集、并输入分析诉求，就能自动生成可视化图表及分析结论，实现降低数据分析的人工成本、提高数据分析效率。 
 ### 在线地址：http://47.107.78.104
+### 架构图：
+![img.png](src/main/resources/static/img/framework.png)
 ### 本地运行：
 * 执行sql文件夹的create_table.sql建表语句。
 * 修改application.yml相关配置信息。
